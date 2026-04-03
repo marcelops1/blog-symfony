@@ -1,0 +1,17 @@
+nelmio_api_doc:
+    documentation:
+        info:
+            title: Blog API
+            description: |
+                RESTful API for managing blog posts and authors.
+                Built with Symfony 8 following Clean Architecture.
+            version: 1.0.0
+        components:
+            securitySchemes: []
+
+    areas:
+        path_patterns:
+            - ^/api(?!/doc$)
+        host_patterns: []
+
+    use_validation_groups: false

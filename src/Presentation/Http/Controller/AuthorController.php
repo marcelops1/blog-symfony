@@ -10,15 +10,44 @@ use App\Application\Author\Find\FindAuthorByIdHandler;
 use App\Application\Author\Find\FindAuthorByIdQuery;
 use App\Domain\Author\Exception\AuthorNotFoundException;
 use App\Domain\Author\Exception\EmailAlreadyExistsException;
+use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
+#[OA\Tag(name: 'Authors')]
 #[Route('/api/authors')]
 final class AuthorController extends AbstractController
 {
+    #[OA\Post(
+        path: '/api/authors',
+        summary: 'Create a new author',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['name', 'email'],
+                properties: [
+                    new OA\Property(property: 'name',  type: 'string', example: 'Jane Doe'),
+                    new OA\Property(property: 'email', type: 'string', format: 'email', example: 'jane@example.com'),
+                    new OA\Property(property: 'bio',   type: 'string', nullable: true, example: 'PHP developer and blogger.'),
+                ],
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Author created',
+                content: new OA\JsonContent(ref: new Model(type: \App\Application\Author\DTO\AuthorDTO::class)),
+            ),
+            new OA\Response(response: 400, description: 'Missing or invalid field',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 409, description: 'E-mail already in use',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+        ],
+    )]
     #[Route('', methods: ['POST'])]
     public function create(
         Request $request,
@@ -46,6 +75,25 @@ final class AuthorController extends AbstractController
         return $this->json($dto, Response::HTTP_CREATED);
     }
 
+    #[OA\Get(
+        path: '/api/authors/{id}',
+        summary: 'Find an author by ID',
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true,
+                description: 'Author UUID', schema: new OA\Schema(type: 'string', format: 'uuid')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Author found',
+                content: new OA\JsonContent(ref: new Model(type: \App\Application\Author\DTO\AuthorDTO::class)),
+            ),
+            new OA\Response(response: 400, description: 'Invalid UUID',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 404, description: 'Author not found',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+        ],
+    )]
     #[Route('/{id}', methods: ['GET'])]
     public function show(
         string $id,

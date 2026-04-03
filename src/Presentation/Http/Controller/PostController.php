@@ -24,15 +24,39 @@ use App\Domain\Post\Exception\InvalidPostStatusTransitionException;
 use App\Domain\Post\Exception\PostNotFoundException;
 use App\Domain\Post\Exception\SlugAlreadyExistsException;
 use App\Domain\Author\Exception\AuthorNotFoundException;
+use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
+#[OA\Tag(name: 'Posts')]
 #[Route('/api/posts')]
 final class PostController extends AbstractController
 {
+    #[OA\Get(
+        path: '/api/posts',
+        summary: 'List posts (paginated)',
+        parameters: [
+            new OA\Parameter(name: 'page',   in: 'query', required: false,
+                description: 'Page number (min 1)', schema: new OA\Schema(type: 'integer', default: 1)),
+            new OA\Parameter(name: 'limit',  in: 'query', required: false,
+                description: 'Items per page (max 100)', schema: new OA\Schema(type: 'integer', default: 10)),
+            new OA\Parameter(name: 'status', in: 'query', required: false,
+                description: 'Filter by status', schema: new OA\Schema(type: 'string', enum: ['draft', 'published', 'archived'])),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Paginated list of posts',
+                content: new OA\JsonContent(ref: new Model(type: \App\Application\Post\DTO\PostListDTO::class)),
+            ),
+            new OA\Response(response: 400, description: 'Invalid status value',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+        ],
+    )]
     #[Route('', methods: ['GET'])]
     public function index(
         Request $request,
@@ -51,6 +75,36 @@ final class PostController extends AbstractController
         return $this->json($result);
     }
 
+    #[OA\Post(
+        path: '/api/posts',
+        summary: 'Create a new post',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['title', 'content', 'authorId'],
+                properties: [
+                    new OA\Property(property: 'title',    type: 'string', example: 'Clean Architecture with PHP'),
+                    new OA\Property(property: 'content',  type: 'string', example: 'A deep dive into layered design patterns...'),
+                    new OA\Property(property: 'authorId', type: 'string', format: 'uuid', example: '01906bef-0000-7000-8000-000000000001'),
+                    new OA\Property(property: 'slug',     type: 'string', nullable: true, example: 'clean-architecture-with-php',
+                        description: 'Auto-generated from title when omitted'),
+                ],
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Post created (status: draft)',
+                content: new OA\JsonContent(ref: new Model(type: \App\Application\Post\DTO\PostDTO::class)),
+            ),
+            new OA\Response(response: 400, description: 'Missing or invalid field',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 404, description: 'Author not found',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 409, description: 'Slug already in use',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+        ],
+    )]
     #[Route('', methods: ['POST'])]
     public function create(
         Request $request,
@@ -81,6 +135,26 @@ final class PostController extends AbstractController
         return $this->json($dto, Response::HTTP_CREATED);
     }
 
+    #[OA\Get(
+        path: '/api/posts/by-slug/{slug}',
+        summary: 'Find a post by slug',
+        parameters: [
+            new OA\Parameter(name: 'slug', in: 'path', required: true,
+                description: 'Post slug (lowercase letters, numbers and hyphens)',
+                schema: new OA\Schema(type: 'string', example: 'clean-architecture-with-php')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Post found',
+                content: new OA\JsonContent(ref: new Model(type: \App\Application\Post\DTO\PostDTO::class)),
+            ),
+            new OA\Response(response: 400, description: 'Invalid slug format',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 404, description: 'Post not found',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+        ],
+    )]
     #[Route('/by-slug/{slug}', methods: ['GET'])]
     public function showBySlug(
         string $slug,
@@ -97,6 +171,25 @@ final class PostController extends AbstractController
         return $this->json($dto);
     }
 
+    #[OA\Get(
+        path: '/api/posts/{id}',
+        summary: 'Find a post by ID',
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true,
+                description: 'Post UUID', schema: new OA\Schema(type: 'string', format: 'uuid')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Post found',
+                content: new OA\JsonContent(ref: new Model(type: \App\Application\Post\DTO\PostDTO::class)),
+            ),
+            new OA\Response(response: 400, description: 'Invalid UUID',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 404, description: 'Post not found',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+        ],
+    )]
     #[Route('/{id}', methods: ['GET'])]
     public function show(
         string $id,
@@ -113,6 +206,38 @@ final class PostController extends AbstractController
         return $this->json($dto);
     }
 
+    #[OA\Put(
+        path: '/api/posts/{id}',
+        summary: 'Update a post',
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true,
+                description: 'Post UUID', schema: new OA\Schema(type: 'string', format: 'uuid')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['title', 'content'],
+                properties: [
+                    new OA\Property(property: 'title',   type: 'string', example: 'Updated Title'),
+                    new OA\Property(property: 'content', type: 'string', example: 'Updated content body...'),
+                    new OA\Property(property: 'slug',    type: 'string', nullable: true, example: 'updated-title'),
+                ],
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Post updated',
+                content: new OA\JsonContent(ref: new Model(type: \App\Application\Post\DTO\PostDTO::class)),
+            ),
+            new OA\Response(response: 400, description: 'Missing or invalid field',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 404, description: 'Post not found',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 409, description: 'Slug already in use',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+        ],
+    )]
     #[Route('/{id}', methods: ['PUT'])]
     public function update(
         string $id,
@@ -144,6 +269,21 @@ final class PostController extends AbstractController
         return $this->json($dto);
     }
 
+    #[OA\Delete(
+        path: '/api/posts/{id}',
+        summary: 'Delete a post',
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true,
+                description: 'Post UUID', schema: new OA\Schema(type: 'string', format: 'uuid')),
+        ],
+        responses: [
+            new OA\Response(response: 204, description: 'Post deleted'),
+            new OA\Response(response: 400, description: 'Invalid UUID',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 404, description: 'Post not found',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+        ],
+    )]
     #[Route('/{id}', methods: ['DELETE'])]
     public function delete(
         string $id,
@@ -160,6 +300,27 @@ final class PostController extends AbstractController
         return $this->json(null, Response::HTTP_NO_CONTENT);
     }
 
+    #[OA\Patch(
+        path: '/api/posts/{id}/publish',
+        summary: 'Publish a post (DRAFT → PUBLISHED)',
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true,
+                description: 'Post UUID', schema: new OA\Schema(type: 'string', format: 'uuid')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Post published',
+                content: new OA\JsonContent(ref: new Model(type: \App\Application\Post\DTO\PostDTO::class)),
+            ),
+            new OA\Response(response: 400, description: 'Invalid UUID',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 404, description: 'Post not found',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 422, description: 'Invalid status transition (e.g. already published or archived)',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+        ],
+    )]
     #[Route('/{id}/publish', methods: ['PATCH'])]
     public function publish(
         string $id,
@@ -178,6 +339,27 @@ final class PostController extends AbstractController
         return $this->json($dto);
     }
 
+    #[OA\Patch(
+        path: '/api/posts/{id}/archive',
+        summary: 'Archive a post (PUBLISHED → ARCHIVED)',
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true,
+                description: 'Post UUID', schema: new OA\Schema(type: 'string', format: 'uuid')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Post archived',
+                content: new OA\JsonContent(ref: new Model(type: \App\Application\Post\DTO\PostDTO::class)),
+            ),
+            new OA\Response(response: 400, description: 'Invalid UUID',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 404, description: 'Post not found',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 422, description: 'Invalid status transition (e.g. post is not published)',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+        ],
+    )]
     #[Route('/{id}/archive', methods: ['PATCH'])]
     public function archive(
         string $id,

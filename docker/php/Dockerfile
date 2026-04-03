@@ -10,6 +10,8 @@ RUN apt-get update && apt-get install -y \
 
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
+RUN pecl install pcov && docker-php-ext-enable pcov
+
 RUN echo "opcache.validate_timestamps=1" \
     > /usr/local/etc/php/conf.d/opcache.ini
 

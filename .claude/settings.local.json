@@ -5,7 +5,11 @@
       "Bash(docker compose:*)",
       "Bash(echo \"EXIT: $?\")",
       "Bash(docker run:*)",
-      "Bash(__NEW_LINE_0f7b8a6445e55c26__ mv:*)"
+      "Bash(__NEW_LINE_0f7b8a6445e55c26__ mv:*)",
+      "Bash(curl -s http://localhost:8080/api/doc)",
+      "Bash(curl -s -o /dev/null -w \"/api/doc → %{http_code}\\\\n\" http://localhost:8080/api/doc)",
+      "Bash(curl -s -o /dev/null -w \"/api/doc.json → %{http_code}\\\\n\" http://localhost:8080/api/doc.json)",
+      "Bash(curl -sv http://localhost:8080/api/doc)"
     ]
   }
 }

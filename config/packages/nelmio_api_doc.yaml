@@ -7,11 +7,19 @@ nelmio_api_doc:
                 Built with Symfony 8 following Clean Architecture.
             version: 1.0.0
         components:
-            securitySchemes: []
+            schemas:
+                ErrorResponse:
+                    type: object
+                    required:
+                        - error
+                    properties:
+                        error:
+                            type: string
+                            example: 'Resource not found.'
 
     areas:
-        path_patterns:
-            - ^/api(?!/doc$)
-        host_patterns: []
+        default:
+            path_patterns:
+                - ^/api(?!/doc)
 
     use_validation_groups: false
